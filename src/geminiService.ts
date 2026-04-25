@@ -9,7 +9,12 @@ import { DRIVERS, TIRES, PIT_STOP_LOSS } from './constants';
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
-export async function getStrategyInsight(state: RaceState, targetDriverId: string): Promise<string> {
+export async function getStrategyInsight(
+  state: RaceState, 
+  targetDriverId: string,
+  plannedLap?: number,
+  plannedCompound?: TireCompound
+): Promise<string> {
   const driverState = state.drivers[targetDriverId];
   const driverInfo = DRIVERS.find(d => d.id === targetDriverId);
   const circuit = state.circuit;
@@ -37,6 +42,12 @@ export async function getStrategyInsight(state: RaceState, targetDriverId: strin
     - Tires: ${driverState.tireCompound} (${driverState.tireAge} laps old)
     - Tire Health: ${driverState.tireHealth.toFixed(1)}%
     
+    ${plannedLap && plannedCompound ? `
+    USER PREFERENCE / PLANNED STRATEGY:
+    - Planned Pit Lap: ${plannedLap}
+    - Target Tire Compound: ${plannedCompound}
+    ` : ''}
+
     Nearby Opponents:
     ${Object.values(state.drivers)
       .sort((a, b) => a.position - b.position)
@@ -47,6 +58,7 @@ export async function getStrategyInsight(state: RaceState, targetDriverId: strin
     Task:
     Provide a "Radio Transmission" style recommendation. 
     Analyze if an UNDERCUT (pitting early to gain track position via fresh tires) or OVERCUT (staying out longer to gain position while others are in traffic/slower) is viable.
+    ${plannedLap ? `Specifically, comment on if the planned pit message for Lap ${plannedLap} onto ${plannedCompound} is optimal or if we should adjust.` : ''}
     Consider the ${PIT_STOP_LOSS}s pit loss.
     Be specific, immersive, and professional. Keep it under 60 words.
   `;

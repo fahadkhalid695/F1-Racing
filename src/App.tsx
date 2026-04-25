@@ -82,10 +82,10 @@ export default function App() {
   const fetchAiInsight = useCallback(async () => {
     if (raceState.currentLap === 0) return;
     setIsAiLoading(true);
-    const insight = await getStrategyInsight(raceState, selectedDriverId);
+    const insight = await getStrategyInsight(raceState, selectedDriverId, whatIfLap, whatIfCompound);
     setAiInsight(insight);
     setIsAiLoading(false);
-  }, [raceState, selectedDriverId]);
+  }, [raceState, selectedDriverId, whatIfLap, whatIfCompound]);
 
   // Auto-fetch insight every 5 laps or when manually requested
   useEffect(() => {
@@ -422,9 +422,14 @@ export default function App() {
                 </div>
                 <div className="h-px bg-white/10"></div>
                 <div className="p-3 border border-dashed border-[#E10600]/40 bg-[#E10600]/5 min-h-[90px]">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Zap className="w-3 h-3 text-[#E10600]" />
-                    <div className="text-[10px] text-[#E10600] uppercase font-black tracking-widest">AI Strategy Core</div>
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="flex items-center gap-2">
+                      <Zap className="w-3 h-3 text-[#E10600]" />
+                      <div className="text-[10px] text-[#E10600] uppercase font-black tracking-widest">AI Strategy Core</div>
+                    </div>
+                    {whatIfLap > raceState.currentLap && (
+                      <div className="text-[8px] bg-white/5 px-1 rounded text-[#8E9299] font-bold">MODE: EVALUATING L{whatIfLap} PLAN</div>
+                    )}
                   </div>
                   {isAiLoading ? (
                     <div className="text-[10px] uppercase font-bold opacity-30 italic animate-pulse">Computing alternative lines...</div>
