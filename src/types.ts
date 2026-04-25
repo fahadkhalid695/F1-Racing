@@ -27,7 +27,8 @@ export interface Circuit {
 export enum TireCompound {
   SOFT = 'SOFT',
   MEDIUM = 'MEDIUM',
-  HARD = 'HARD'
+  HARD = 'HARD',
+  WET = 'WET'
 }
 
 export interface TireData {
@@ -62,6 +63,7 @@ export interface RaceState {
 export interface DriverRaceState {
   driverId: string;
   position: number;
+  prevPosition: number;
   totalTime: number;
   lastLapTime: number;
   bestLapTime: number;
@@ -71,6 +73,7 @@ export interface DriverRaceState {
   stops: number;
   currentGap: number;
   status: 'RACING' | 'PIT_STOP' | 'OUT';
+  lastEvent?: 'OVERTAKE_SUCCESS' | 'OVERTAKE_FAILED' | 'PIT_STOP' | 'NONE';
   strategyRecommendation?: string;
 }
 

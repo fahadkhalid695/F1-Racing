@@ -5,7 +5,7 @@
 
 import { GoogleGenAI } from "@google/genai";
 import { RaceState, DriverRaceState } from './types';
-import { DRIVERS } from './constants';
+import { DRIVERS, TIRES, PIT_STOP_LOSS } from './constants';
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
@@ -19,25 +19,36 @@ export async function getStrategyInsight(state: RaceState, targetDriverId: strin
   const prompt = `
     You are an elite F1 Race Engineer. Analyze the current race situation and give a concise, professional recommendation to your driver.
     
-    Race Context:
+    Race Metadata:
     - Circuit: ${circuit.name} (${state.currentLap}/${state.totalLaps} laps)
     - Weather: ${state.weather}
     - Safety Car: ${state.safetyCar ? 'ACTIVE' : 'NONE'}
+    - Pit Stop Delta: ~${PIT_STOP_LOSS}s loss
+    
+    Tire Data:
+    - Soft: +${TIRES.SOFT.basePace}s pace, high wear
+    - Medium: Reference pace, avg wear
+    - Hard: +${TIRES.HARD.basePace}s pace, low wear
     
     Driver Status (${driverInfo.name}):
     - Position: P${driverState.position}
     - Gap to Leader: +${driverState.currentGap.toFixed(3)}s
+    - Last Lap: ${driverState.lastLapTime.toFixed(3)}s
     - Tires: ${driverState.tireCompound} (${driverState.tireAge} laps old)
     - Tire Health: ${driverState.tireHealth.toFixed(1)}%
-    - Stops: ${driverState.stops}
     
-    Current Field:
+    Nearby Opponents:
     ${Object.values(state.drivers)
       .sort((a, b) => a.position - b.position)
-      .map(d => `P${d.position}: ${DRIVERS.find(dr => dr.id === d.driverId)?.shortName} - Gap: +${d.currentGap.toFixed(1)}s - Tires: ${d.tireCompound}`)
+      .filter(d => Math.abs(d.position - driverState.position) <= 2 && d.driverId !== targetDriverId)
+      .map(d => `P${d.position}: ${DRIVERS.find(dr => dr.id === d.driverId)?.shortName} (Gap: ${d.currentGap.toFixed(1)}s, Tires: ${d.tireCompound} L${d.tireAge})`)
       .join('\n')}
       
-    Provide a "Radio Transmision" style recommendation. Should we pit? Should we push? Is there an undercut opportunity? Be specific and immersive. Keep it under 60 words.
+    Task:
+    Provide a "Radio Transmission" style recommendation. 
+    Analyze if an UNDERCUT (pitting early to gain track position via fresh tires) or OVERCUT (staying out longer to gain position while others are in traffic/slower) is viable.
+    Consider the ${PIT_STOP_LOSS}s pit loss.
+    Be specific, immersive, and professional. Keep it under 60 words.
   `;
 
   try {

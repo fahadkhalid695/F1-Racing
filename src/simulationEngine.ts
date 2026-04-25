@@ -20,6 +20,27 @@ export const calculateLapTime = (
   // Tire compound relative pace
   time += tire.basePace;
   
+  // Weather effect and tire matching
+  if (weather === Weather.RAIN) {
+    if (state.tireCompound !== TireCompound.WET) {
+      // Massive penalty for dry tires in rain
+      time += 15.0; 
+    } else {
+      // Wet tires are optimized for rain but still slower than slick dry pace
+      time += 4.0;
+    }
+  } else if (weather === Weather.CLOUDY) {
+    if (state.tireCompound === TireCompound.WET) {
+      // Wets on dry/cloudy track are very slow and wear fast (simulated in wear logic)
+      time += 8.0;
+    }
+    time += 0.5;
+  } else { // SUNNY
+    if (state.tireCompound === TireCompound.WET) {
+      time += 12.0;
+    }
+  }
+  
   // Tire wear effect (exponential degradation)
   const wear = Math.max(0, 100 - state.tireHealth);
   const wearPenalty = Math.pow(wear / 20, 1.5) * 0.1;
@@ -28,14 +49,6 @@ export const calculateLapTime = (
   // Driver skill (faster drivers subtract from lap time)
   const skillBonus = (driver.skill / 100) * 1.5;
   time -= skillBonus;
-  
-  // Weather effect
-  if (weather === Weather.RAIN) time += 4.0;
-  if (weather === Weather.CLOUDY) time += 0.5;
-  
-  // Fuel burn (simplified: cars get lighter over race)
-  // We'll assume a constant improvement of 0.03s per lap
-  // We don't have currentLap here, so let's pass it or assume it's calculated elsewhere
   
   // Random variance (consistency)
   const varianceFactor = (100 - driver.consistency) / 100;
@@ -48,6 +61,15 @@ export const calculateLapTime = (
 export const simulateLap = (prevState: RaceState): RaceState => {
   const nextLap = prevState.currentLap + 1;
   if (nextLap > prevState.totalLaps) return { ...prevState, isFinished: true };
+
+  // 0. Dynamic Weather Transition
+  let nextWeather = prevState.weather;
+  const weatherRoll = Math.random();
+  if (weatherRoll < 0.04) { // 4% chance of change
+    if (nextWeather === Weather.SUNNY) nextWeather = Weather.CLOUDY;
+    else if (nextWeather === Weather.CLOUDY) nextWeather = Math.random() > 0.5 ? Weather.RAIN : Weather.SUNNY;
+    else if (nextWeather === Weather.RAIN) nextWeather = Weather.CLOUDY;
+  }
 
   const updatedDrivers: Record<string, DriverRaceState> = {};
   const lapResults: LapResult[] = [];
@@ -64,11 +86,23 @@ export const simulateLap = (prevState: RaceState): RaceState => {
     let totalTime = d.totalTime;
     let stops = d.stops;
 
-    // Simple pit strategy logic: pit if health < 30%
-    if (tireHealth < 30 && status === 'RACING') {
+    // Advanced pit strategy logic: pit if health < 30% OR weather mismatch
+    const needsWet = nextWeather === Weather.RAIN;
+    const hasWet = d.tireCompound === TireCompound.WET;
+    const weatherMismatch = (needsWet && !hasWet) || (!needsWet && hasWet);
+
+    if ((tireHealth < 25 || weatherMismatch) && status === 'RACING') {
       status = 'PIT_STOP';
       totalTime += PIT_STOP_LOSS;
-      tireCompound = nextCompound(d.tireCompound);
+      
+      // Determine next tire
+      if (needsWet) {
+        tireCompound = TireCompound.WET;
+      } else {
+        // If it stopped raining, go to Mediums or whatever was next
+        tireCompound = nextCompound(d.tireCompound === TireCompound.WET ? TireCompound.HARD : d.tireCompound);
+      }
+      
       tireAge = 0;
       tireHealth = 100;
       stops += 1;
@@ -76,7 +110,7 @@ export const simulateLap = (prevState: RaceState): RaceState => {
       status = 'RACING';
     }
 
-    const lapTime = calculateLapTime(d, prevState.circuit, prevState.weather);
+    const lapTime = calculateLapTime(d, prevState.circuit, nextWeather);
     const finalLapTime = (status === 'PIT_STOP') ? lapTime + (PIT_STOP_LOSS / 2) : lapTime; // splitting loss
     
     const newTotalTime = totalTime + finalLapTime;
@@ -96,12 +130,60 @@ export const simulateLap = (prevState: RaceState): RaceState => {
     };
   });
 
-  // 2. Sort by total time to get positions
-  const sortedDrivers = Object.values(updatedDrivers).sort((a, b) => a.totalTime - b.totalTime);
-  const leaderTime = sortedDrivers[0].totalTime;
+  // 2. Resolve field positions and handle overtaking/dirty air
+  const sortedByPrevPos = Object.values(updatedDrivers).sort((a, b) => a.position - b.position);
+  const resolvedDrivers: DriverRaceState[] = [];
+  
+  // The leader always sets their own pace
+  resolvedDrivers.push(sortedByPrevPos[0]);
 
-  sortedDrivers.forEach((d, idx) => {
+  for (let i = 1; i < sortedByPrevPos.length; i++) {
+    const attacker = sortedByPrevPos[i];
+    const defender = resolvedDrivers[i - 1]; // The car currently in front of them
+    
+    const attackerInfo = DRIVERS.find(d => d.id === attacker.driverId)!;
+    const defenderInfo = DRIVERS.find(d => d.id === defender.driverId)!;
+    
+    // Check if the attacker would naturally be ahead based on total time
+    attacker.lastEvent = 'NONE';
+    attacker.prevPosition = prevState.drivers[attacker.driverId].position;
+
+    if (attacker.totalTime < defender.totalTime) {
+      // Overtake Attempt
+      const paceDelta = defender.lastLapTime - attacker.lastLapTime;
+      const tireDelta = attacker.tireHealth - defender.tireHealth;
+      
+      let overtakeChance = (100 - prevState.circuit.overtakeDifficulty) / 150;
+      overtakeChance += (paceDelta / 2);
+      overtakeChance += (attackerInfo.aggression / 500);
+      overtakeChance += (tireDelta / 200);
+      
+      overtakeChance -= (defenderInfo.consistency / 400);
+      
+      const roll = Math.random();
+      const success = roll < overtakeChance;
+      
+      if (!success) {
+        // FAILED OVERTAKE
+        const buffer = 0.3 + (Math.random() * 0.4);
+        attacker.totalTime = defender.totalTime + buffer;
+        const prevTotal = prevState.drivers[attacker.driverId].totalTime;
+        attacker.lastLapTime = attacker.totalTime - prevTotal;
+        attacker.lastEvent = 'OVERTAKE_FAILED';
+      } else {
+        attacker.lastEvent = 'OVERTAKE_SUCCESS';
+      }
+    }
+    resolvedDrivers.push(attacker);
+  }
+
+  // 3. Final classification and gap calculation
+  const sortedFinal = resolvedDrivers.sort((a, b) => a.totalTime - b.totalTime);
+  const leaderTime = sortedFinal[0].totalTime;
+
+  sortedFinal.forEach((d, idx) => {
     d.position = idx + 1;
+    if (prevState.drivers[d.driverId].status === 'PIT_STOP') d.lastEvent = 'PIT_STOP';
     d.currentGap = d.totalTime - leaderTime;
     
     lapResults.push({
@@ -121,7 +203,8 @@ export const simulateLap = (prevState: RaceState): RaceState => {
     currentLap: nextLap,
     drivers: updatedDrivers,
     history: [...prevState.history, ...lapResults],
-    isFinished: nextLap === prevState.totalLaps
+    isFinished: nextLap === prevState.totalLaps,
+    weather: nextWeather
   };
 };
 
@@ -138,6 +221,7 @@ export const initializeRace = (circuit: Circuit): RaceState => {
     drivers[d.id] = {
       driverId: d.id,
       position: idx + 1,
+      prevPosition: idx + 1,
       totalTime: 0,
       lastLapTime: 0,
       bestLapTime: 0,
@@ -146,7 +230,8 @@ export const initializeRace = (circuit: Circuit): RaceState => {
       tireHealth: 100,
       stops: 0,
       currentGap: 0,
-      status: 'RACING'
+      status: 'RACING',
+      lastEvent: 'NONE'
     };
   });
 

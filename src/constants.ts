@@ -30,6 +30,7 @@ export const TIRES: Record<TireCompound, TireData> = {
   [TireCompound.SOFT]: { compound: TireCompound.SOFT, grip: 1.0, degradationRate: 2.5, basePace: -1.0 },
   [TireCompound.MEDIUM]: { compound: TireCompound.MEDIUM, grip: 0.95, degradationRate: 1.2, basePace: 0.0 },
   [TireCompound.HARD]: { compound: TireCompound.HARD, grip: 0.9, degradationRate: 0.6, basePace: 0.8 },
+  [TireCompound.WET]: { compound: TireCompound.WET, grip: 0.7, degradationRate: 0.4, basePace: 6.0 },
 };
 
 export const PIT_STOP_LOSS = 22.0; // seconds lost in pits
