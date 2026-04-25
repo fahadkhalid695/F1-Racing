@@ -19,9 +19,10 @@ export interface Circuit {
   name: string;
   location: string;
   laps: number;
-  baseLapTime: number; // in seconds
-  tireWearFactor: number; // multiplier
-  overtakeDifficulty: number; // 0-100
+  baseLapTime: number; 
+  tireWearFactor: number; 
+  overtakeDifficulty: number; 
+  safetyCarChance: number; // 0-1 (e.g., 0.02)
 }
 
 export enum TireCompound {
@@ -49,6 +50,12 @@ export interface LapResult {
   status: 'RACING' | 'PIT_STOP' | 'OUT';
 }
 
+export interface RaceMessage {
+  lap: number;
+  text: string;
+  type: 'INFO' | 'WARNING' | 'CRITICAL' | 'SC';
+}
+
 export interface RaceState {
   currentLap: number;
   totalLaps: number;
@@ -57,7 +64,20 @@ export interface RaceState {
   isFinished: boolean;
   weather: Weather;
   safetyCar: boolean;
+  safetyCarLapsRemaining: number;
   history: LapResult[];
+  messages: RaceMessage[];
+}
+
+export interface Telemetry {
+  speed: number;
+  rpm: number;
+  tireTemp: {
+    fl: number;
+    fr: number;
+    rl: number;
+    rr: number;
+  };
 }
 
 export interface DriverRaceState {
@@ -75,6 +95,7 @@ export interface DriverRaceState {
   status: 'RACING' | 'PIT_STOP' | 'OUT';
   lastEvent?: 'OVERTAKE_SUCCESS' | 'OVERTAKE_FAILED' | 'PIT_STOP' | 'NONE';
   strategyRecommendation?: string;
+  telemetry: Telemetry;
 }
 
 export enum Weather {

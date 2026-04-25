@@ -4,7 +4,7 @@
  */
 
 import { GoogleGenAI } from "@google/genai";
-import { RaceState, DriverRaceState } from './types';
+import { RaceState, DriverRaceState, TireCompound } from './types';
 import { DRIVERS, TIRES, PIT_STOP_LOSS } from './constants';
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
@@ -60,5 +60,48 @@ export async function getStrategyInsight(state: RaceState, targetDriverId: strin
   } catch (error) {
     console.error("AI Strategy Error:", error);
     return "Connection lost with pit wall.";
+  }
+}
+
+export async function getWhatIfProjection(
+  state: RaceState, 
+  targetDriverId: string, 
+  targetLap: number, 
+  targetCompound: TireCompound
+): Promise<string> {
+  const driverState = state.drivers[targetDriverId];
+  const driverInfo = DRIVERS.find(d => d.id === targetDriverId);
+
+  if (!driverState || !driverInfo) return "No data.";
+
+  const prompt = `
+    You are an elite F1 Strategist. A "What-If" scenario has been proposed.
+    
+    Current Sitation:
+    - Driver: ${driverInfo.name} (P${driverState.position})
+    - Current Lap: ${state.currentLap} / ${state.totalLaps}
+    - Current Tires: ${driverState.tireCompound} (Age: ${driverState.tireAge})
+    - Weather: ${state.weather}
+    
+    Proposed Strategy Change:
+    - Pit on Lap: ${targetLap}
+    - Switch to Compound: ${targetCompound}
+    
+    Field Context:
+    Leader is P1, ${driverState.currentGap.toFixed(1)}s ahead.
+    Pit stop loss is ${PIT_STOP_LOSS}s.
+    
+    Predict the outcome of this strategy. Will they lose track position? Can they recover it with fresh tires? Compare the "Estimated Finish Position" vs current. 
+    Be professional, data-driven, and concise (under 60 words).
+  `;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: prompt,
+    });
+    return response.text || "Projection unavailable.";
+  } catch (error) {
+    return "Sim process failed.";
   }
 }

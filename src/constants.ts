@@ -20,10 +20,10 @@ export const DRIVERS: Driver[] = [
 ];
 
 export const CIRCUITS: Circuit[] = [
-  { id: 'monaco', name: 'Silverstone', location: 'United Kingdom', laps: 52, baseLapTime: 87.0, tireWearFactor: 1.2, overtakeDifficulty: 60 },
-  { id: 'spa', name: 'Spa-Francorchamps', location: 'Belgium', laps: 44, baseLapTime: 104.0, tireWearFactor: 1.5, overtakeDifficulty: 40 },
-  { id: 'monaco_real', name: 'Monaco', location: 'Monaco', laps: 78, baseLapTime: 71.0, tireWearFactor: 0.8, overtakeDifficulty: 95 },
-  { id: 'interlagos', name: 'Interlagos', location: 'Brazil', laps: 71, baseLapTime: 68.0, tireWearFactor: 1.1, overtakeDifficulty: 45 },
+  { id: 'monaco', name: 'Silverstone', location: 'United Kingdom', laps: 52, baseLapTime: 87.0, tireWearFactor: 1.2, overtakeDifficulty: 60, safetyCarChance: 0.03 },
+  { id: 'spa', name: 'Spa-Francorchamps', location: 'Belgium', laps: 44, baseLapTime: 104.0, tireWearFactor: 1.5, overtakeDifficulty: 40, safetyCarChance: 0.05 },
+  { id: 'monaco_real', name: 'Monaco', location: 'Monaco', laps: 78, baseLapTime: 71.0, tireWearFactor: 0.8, overtakeDifficulty: 95, safetyCarChance: 0.06 },
+  { id: 'interlagos', name: 'Interlagos', location: 'Brazil', laps: 71, baseLapTime: 68.0, tireWearFactor: 1.1, overtakeDifficulty: 45, safetyCarChance: 0.04 },
 ];
 
 export const TIRES: Record<TireCompound, TireData> = {
