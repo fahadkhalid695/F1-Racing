@@ -1,0 +1,6 @@
+{
+  "name": "F1 AI Strategy System",
+  "description": "Advanced real-time Formula 1 race strategy simulator with AI-powered strategy recommendations, tire degradation models, and dynamic weather simulation.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["AI Strategy", "Race Simulation", "Strategy Analysis"]
+}
